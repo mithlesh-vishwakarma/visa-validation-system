@@ -9,3 +9,11 @@ psycopg2-binary>=2.9.9
 celery>=5.3.6
 redis>=5.0.1
 pillow>=10.2.0
+requests>=2.31.0
+
+# Optional AI providers (install only the one you plan to use)
+# Uncomment to enable real AI analysis:
+openai>=1.30.0          # For AI_PROVIDER=openai
+anthropic>=0.28.0       # For AI_PROVIDER=claude
+google-generativeai>=0.6.0  # For AI_PROVIDER=gemini
+

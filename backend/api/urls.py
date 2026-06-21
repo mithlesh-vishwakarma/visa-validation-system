@@ -6,6 +6,7 @@ from authentication.views import RegisterView, UserProfileView, OrganizationUser
 from clients.views import ClientViewSet
 from rules_engine.views import CountryRuleViewSet
 from submissions.views import SubmissionViewSet, DocumentViewSet, ActivityLogViewSet, DashboardAnalyticsAPI
+from eligibility.views import EligibilityScoreViewSet
 
 router = DefaultRouter()
 router.register(r'org-users', OrganizationUsersViewSet, basename='org-users')
@@ -14,17 +15,18 @@ router.register(r'country-rules', CountryRuleViewSet, basename='country-rules')
 router.register(r'submissions', SubmissionViewSet, basename='submissions')
 router.register(r'documents', DocumentViewSet, basename='documents')
 router.register(r'activity-logs', ActivityLogViewSet, basename='activity-logs')
+router.register(r'eligibility', EligibilityScoreViewSet, basename='eligibility')
 
 urlpatterns = [
-    # Auth
+    # Authentication
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('auth/profile/', UserProfileView.as_view(), name='profile'),
     path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    
-    # Dashboard Analytics
+
+    # Dashboard Analytics (enhanced with AI metrics)
     path('dashboard/analytics/', DashboardAnalyticsAPI.as_view(), name='dashboard-analytics'),
-    
-    # Router endpoints
+
+    # Router endpoints (includes all ViewSets above)
     path('', include(router.urls)),
 ]

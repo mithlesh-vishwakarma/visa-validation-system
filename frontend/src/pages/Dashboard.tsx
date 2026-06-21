@@ -1,16 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import type { DashboardData } from '../types';
-import { 
-  Users, 
-  FileCheck, 
-  FileClock, 
+import {
+  Users,
+  FileCheck,
+  FileClock,
   FileWarning,
   Activity,
   Award,
   Globe,
   Loader2,
-  TrendingUp
+  TrendingUp,
+  Brain,
+  ShieldCheck,
+  AlertOctagon
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -64,8 +67,19 @@ export default function Dashboard() {
     { label: 'Approved Cases', value: metrics.approved, icon: FileCheck, color: 'text-emerald-400', bg: 'bg-emerald-500/5 border-emerald-500/10' },
     { label: 'Under Review / Pending', value: metrics.under_review + metrics.pending, icon: FileClock, color: 'text-amber-400', bg: 'bg-amber-500/5 border-amber-500/10' },
     { label: 'Rejected Cases', value: metrics.rejected, icon: FileWarning, color: 'text-rose-400', bg: 'bg-rose-500/5 border-rose-500/10' },
-    { label: 'Avg Validation Score', value: `${metrics.avg_score}%`, icon: Award, color: 'text-violet-400', bg: 'bg-violet-500/5 border-violet-500/10' },
+    { label: 'Avg Rules Score', value: `${metrics.avg_score}%`, icon: Award, color: 'text-violet-400', bg: 'bg-violet-500/5 border-violet-500/10' },
+    // AI Metrics
+    { label: 'AI Assessed', value: metrics.total_ai_assessed ?? 0, icon: Brain, color: 'text-purple-400', bg: 'bg-purple-500/5 border-purple-500/10' },
+    { label: 'Avg AI Score', value: `${metrics.avg_eligibility_score ?? 0}`, icon: ShieldCheck, color: 'text-teal-400', bg: 'bg-teal-500/5 border-teal-500/10' },
+    { label: 'High Risk', value: metrics.risk_distribution?.HIGH ?? 0, icon: AlertOctagon, color: 'text-rose-400', bg: 'bg-rose-500/5 border-rose-500/10' },
   ];
+
+  const riskDistData = [
+    { name: 'Low Risk', value: metrics.risk_distribution?.LOW ?? 0, color: '#10b981' },
+    { name: 'Medium Risk', value: metrics.risk_distribution?.MEDIUM ?? 0, color: '#f59e0b' },
+    { name: 'High Risk', value: metrics.risk_distribution?.HIGH ?? 0, color: '#ef4444' },
+  ];
+
 
   return (
     <div className="space-y-6">
@@ -75,8 +89,8 @@ export default function Dashboard() {
         <p className="text-xs text-slate-400">Visual dashboard for client statistics and document check compliance metrics.</p>
       </div>
 
-      {/* Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+      {/* Metric Cards Grid — 9 cards: 6 existing + 3 AI metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-9 gap-4">
         {cardData.map((card, idx) => {
           const Icon = card.icon;
           return (

@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'clients',
     'submissions',
     'rules_engine',
+    'eligibility',
     'ocr',
 ]
 
@@ -168,6 +169,26 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 SUPABASE_BUCKET = os.getenv('SUPABASE_BUCKET', 'visa-documents')
+
+# ---------------------------------------------------------------------------
+# AI Provider Configuration
+# ---------------------------------------------------------------------------
+# AI_PROVIDER options: 'mock' | 'openai' | 'claude' | 'gemini'
+# Set to 'mock' for development (no API key required).
+# The mock provider returns realistic structured data for testing.
+AI_PROVIDER = os.getenv('AI_PROVIDER', 'mock')
+
+# OpenAI (GPT-4o / GPT-4-turbo)
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+
+# Anthropic Claude
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307')
+
+# Google Gemini
+GOOGLE_AI_API_KEY = os.getenv('GOOGLE_AI_API_KEY', '')
+GOOGLE_AI_MODEL = os.getenv('GOOGLE_AI_MODEL', 'gemini-1.5-flash')
 
 # Celery Configuration
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')

@@ -1,15 +1,16 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileText, 
-  Settings, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  Settings,
+  LogOut,
   Menu,
   Shield,
-  Building2
+  Building2,
+  BarChart3
 } from 'lucide-react';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Clients', path: '/clients', icon: Users },
     { label: 'Visa Applications', path: '/submissions', icon: FileText },
+    { label: 'Reports', path: '/reports', icon: BarChart3 },
   ];
 
   // Show Admin link only for admins

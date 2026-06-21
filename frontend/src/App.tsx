@@ -9,6 +9,7 @@ import Clients from './pages/Clients';
 import Submissions from './pages/Submissions';
 import SubmissionDetail from './pages/SubmissionDetail';
 import Admin from './pages/Admin';
+import Reports from './pages/Reports';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +36,7 @@ function App() {
             <Route path="/clients" element={<Clients />} />
             <Route path="/submissions" element={<Submissions />} />
             <Route path="/submissions/:id" element={<SubmissionDetail />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="/admin" element={<Admin />} />
           </Route>
 
