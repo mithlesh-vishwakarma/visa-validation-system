@@ -43,6 +43,25 @@ def assess_risk(
     # HIGH SEVERITY checks
     # -----------------------------------------------------------------------
 
+    # Check for document type mismatches in any uploaded document
+    for category, analysis in doc_map.items():
+        is_mismatch = (
+            analysis.get('invalid_document_type')
+            or any("type mismatch" in str(a).lower() or "document mismatch" in str(a).lower() for a in analysis.get('anomalies', []))
+        )
+        if is_mismatch:
+            mismatch_detail = next(
+                (str(a) for a in analysis.get('anomalies', []) if "mismatch" in str(a).lower()),
+                f"Uploaded document for '{category}' does not match the required document type."
+            )
+            risk_factors.append({
+                "factor": "Document Type Mismatch",
+                "severity": "HIGH",
+                "detail": mismatch_detail,
+                "category": category,
+            })
+
+
     # 1. Expired passport
     passport = doc_map.get('passport', {})
     if passport.get('is_expired'):

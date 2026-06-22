@@ -1,0 +1,47 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Python
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases
+*.sqlite3
+db.sqlite3
+
+# Node / JS
+node_modules/
+dist/
+.eslintcache
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor/OS directories and files
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Media & Static directories
+media/
+backend/media/
+static/
+staticfiles/

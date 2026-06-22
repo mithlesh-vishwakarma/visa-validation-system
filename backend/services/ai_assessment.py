@@ -137,15 +137,15 @@ def _run_document_ai_analysis(doc) -> None:
     Run AI analysis on a single document that hasn't been analyzed yet.
     Updates the document's ai_analysis and confidence_score fields.
     """
-    from services.document_analyzers import get_analyzer
+    from services.ai_provider import get_ai_provider
 
     try:
         raw_text = doc.raw_text or ""
         extracted_data = doc.extracted_data or {}
         category = doc.category or 'other'
 
-        analyzer = get_analyzer(category)
-        ai_analysis = analyzer.analyze(raw_text, extracted_data)
+        ai_provider = get_ai_provider()
+        ai_analysis = ai_provider.analyze_document(category, raw_text, extracted_data)
 
         doc.ai_analysis = ai_analysis
         doc.confidence_score = ai_analysis.get('confidence', 0.5)

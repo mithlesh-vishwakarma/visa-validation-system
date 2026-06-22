@@ -57,28 +57,25 @@ class AIProvider(ABC):
         """
         pass
 
+    def _build_document_prompt(self, doc_category: str, raw_text: str, extracted_data: dict) -> str:
+        """
+        Build the analysis prompt for LLMs, including document verification guidelines.
+        """
+        return (
+            f"Analyze this document which is expected to be a '{doc_category.replace('_', ' ')}' for a visa application.\n\n"
+            f"Pre-extracted data: {extracted_data}\n\n"
+            f"Raw document text (first 2000 chars): {raw_text[:2000]}\n\n"
+            f"CRITICAL INSTRUCTIONS:\n"
+            f"1. First, check if the raw text matches the expected category '{doc_category}'.\n"
+            f"2. If the document is obviously a different type (for example, a School Leaving Certificate, SSC/HSC certificate, marksheet, or passing certificate uploaded instead of a passport or bank statement), you MUST flag this mismatch.\n"
+            f"3. In case of mismatch:\n"
+            f"   - Set 'invalid_document_type': true\n"
+            f"   - Add a detail anomaly in the 'anomalies' list explaining the mismatch (e.g., 'Document Mismatch: Uploaded document is a School Leaving Certificate, not a Passport')\n"
+            f"   - Set 'confidence': 0.0\n"
+            f"   - Return default empty/zero values for other category-specific fields.\n"
+            f"4. If it matches, perform standard extraction. Return a JSON object with document-specific fields, 'anomalies' (list of strings), and 'confidence' (float 0.0-1.0)."
+        )
 
-# ---------------------------------------------------------------------------
-# Mock AI Provider (Default — No API Key Required)
-# ---------------------------------------------------------------------------
-
-class MockAIProvider(AIProvider):
-    """
-    Intelligent mock AI provider for development and testing.
-    Returns realistic structured analysis based on extracted document data.
-    No API key or network connection required.
-    """
-
-    def analyze_document(self, doc_category: str, raw_text: str, extracted_data: dict) -> dict:
-        """Generate realistic mock analysis per document category."""
-        from services.document_analyzers import get_analyzer
-        analyzer = get_analyzer(doc_category)
-        return analyzer.analyze(raw_text, extracted_data)
-
-    def generate_eligibility_assessment(self, submission_data: dict) -> dict:
-        """Generate mock eligibility assessment from scoring engine."""
-        from services.eligibility_engine import compute_eligibility
-        return compute_eligibility(submission_data)
 
 
 # ---------------------------------------------------------------------------
@@ -93,17 +90,14 @@ class OpenAIProvider(AIProvider):
 
     def __init__(self):
         try:
-            from openai import OpenAI
+            from openai import OpenAI # type: ignore
             self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
             self.model = getattr(settings, 'OPENAI_MODEL', 'gpt-4o-mini')
         except ImportError:
-            logger.warning("openai package not installed. Falling back to mock.")
-            self._fallback = MockAIProvider()
+            logger.error("openai package not installed.")
+            raise
 
     def analyze_document(self, doc_category: str, raw_text: str, extracted_data: dict) -> dict:
-        if hasattr(self, '_fallback'):
-            return self._fallback.analyze_document(doc_category, raw_text, extracted_data)
-
         prompt = self._build_document_prompt(doc_category, raw_text, extracted_data)
         try:
             import json
@@ -118,21 +112,12 @@ class OpenAIProvider(AIProvider):
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
-            logger.error(f"OpenAI analysis failed: {e}. Using mock fallback.")
-            return MockAIProvider().analyze_document(doc_category, raw_text, extracted_data)
+            logger.error(f"OpenAI analysis failed: {e}")
+            raise
 
     def generate_eligibility_assessment(self, submission_data: dict) -> dict:
-        if hasattr(self, '_fallback'):
-            return self._fallback.generate_eligibility_assessment(submission_data)
-        return MockAIProvider().generate_eligibility_assessment(submission_data)
-
-    def _build_document_prompt(self, doc_category: str, raw_text: str, extracted_data: dict) -> str:
-        return (
-            f"Analyze this {doc_category.replace('_', ' ')} document for a visa application.\n\n"
-            f"Pre-extracted data: {extracted_data}\n\n"
-            f"Raw document text (first 2000 chars): {raw_text[:2000]}\n\n"
-            f"Return a JSON object with document-specific fields and an 'anomalies' list of any suspicious findings."
-        )
+        from services.eligibility_engine import compute_eligibility
+        return compute_eligibility(submission_data)
 
 
 # ---------------------------------------------------------------------------
@@ -147,38 +132,33 @@ class ClaudeProvider(AIProvider):
 
     def __init__(self):
         try:
-            import anthropic
+            import anthropic # type: ignore
             self.client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
             self.model = getattr(settings, 'ANTHROPIC_MODEL', 'claude-3-haiku-20240307')
         except ImportError:
-            logger.warning("anthropic package not installed. Falling back to mock.")
-            self._fallback = MockAIProvider()
+            logger.error("anthropic package not installed.")
+            raise
 
     def analyze_document(self, doc_category: str, raw_text: str, extracted_data: dict) -> dict:
-        if hasattr(self, '_fallback'):
-            return self._fallback.analyze_document(doc_category, raw_text, extracted_data)
         try:
             import json
+            prompt = self._build_document_prompt(doc_category, raw_text, extracted_data)
             message = self.client.messages.create(
                 model=self.model,
                 max_tokens=1024,
                 messages=[{
                     "role": "user",
-                    "content": (
-                        f"Analyze this visa document ({doc_category}). "
-                        f"Pre-extracted: {extracted_data}. "
-                        f"Text: {raw_text[:2000]}. "
-                        f"Respond with JSON only."
-                    )
+                    "content": prompt
                 }]
             )
             return json.loads(message.content[0].text)
         except Exception as e:
-            logger.error(f"Claude analysis failed: {e}. Using mock fallback.")
-            return MockAIProvider().analyze_document(doc_category, raw_text, extracted_data)
+            logger.error(f"Claude analysis failed: {e}")
+            raise
 
     def generate_eligibility_assessment(self, submission_data: dict) -> dict:
-        return MockAIProvider().generate_eligibility_assessment(submission_data)
+        from services.eligibility_engine import compute_eligibility
+        return compute_eligibility(submission_data)
 
 
 # ---------------------------------------------------------------------------
@@ -193,34 +173,34 @@ class GeminiProvider(AIProvider):
 
     def __init__(self):
         try:
-            import google.generativeai as genai
+            import google.generativeai as genai # type: ignore
             genai.configure(api_key=settings.GOOGLE_AI_API_KEY)
             self.model = genai.GenerativeModel(
-                getattr(settings, 'GOOGLE_AI_MODEL', 'gemini-1.5-flash')
+                getattr(settings, 'GOOGLE_AI_MODEL', 'gemini-2.5-flash')
             )
         except ImportError:
-            logger.warning("google-generativeai not installed. Falling back to mock.")
-            self._fallback = MockAIProvider()
+            logger.error("google-generativeai not installed.")
+            raise
 
     def analyze_document(self, doc_category: str, raw_text: str, extracted_data: dict) -> dict:
-        if hasattr(self, '_fallback'):
-            return self._fallback.analyze_document(doc_category, raw_text, extracted_data)
         try:
             import json
-            prompt = (
-                f"Analyze this visa document ({doc_category}) and return JSON only. "
-                f"Pre-extracted data: {extracted_data}. "
-                f"Document text: {raw_text[:2000]}"
-            )
+            prompt = self._build_document_prompt(doc_category, raw_text, extracted_data)
             response = self.model.generate_content(prompt)
-            text = response.text.strip().lstrip('```json').rstrip('```').strip()
+            text = response.text.strip()
+            if text.startswith("```json"):
+                text = text[7:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
             return json.loads(text)
         except Exception as e:
-            logger.error(f"Gemini analysis failed: {e}. Using mock fallback.")
-            return MockAIProvider().analyze_document(doc_category, raw_text, extracted_data)
+            logger.error(f"Gemini analysis failed: {e}")
+            raise e
 
     def generate_eligibility_assessment(self, submission_data: dict) -> dict:
-        return MockAIProvider().generate_eligibility_assessment(submission_data)
+        from services.eligibility_engine import compute_eligibility
+        return compute_eligibility(submission_data)
 
 
 # ---------------------------------------------------------------------------
@@ -234,13 +214,12 @@ def get_ai_provider() -> AIProvider:
     """
     Returns the configured AI provider singleton.
     Provider is determined by the AI_PROVIDER environment variable.
-    Defaults to MockAIProvider if not set or if the configured provider fails.
     """
     global _provider_instance
     if _provider_instance is not None:
         return _provider_instance
 
-    provider_name = getattr(settings, 'AI_PROVIDER', 'mock').lower()
+    provider_name = getattr(settings, 'AI_PROVIDER', 'gemini').lower()
     logger.info(f"Initializing AI provider: {provider_name}")
 
     if provider_name == 'openai' and getattr(settings, 'OPENAI_API_KEY', ''):
@@ -250,11 +229,9 @@ def get_ai_provider() -> AIProvider:
     elif provider_name == 'gemini' and getattr(settings, 'GOOGLE_AI_API_KEY', ''):
         _provider_instance = GeminiProvider()
     else:
-        if provider_name != 'mock':
-            logger.warning(
-                f"AI provider '{provider_name}' requested but API key not set. "
-                f"Falling back to MockAIProvider."
-            )
-        _provider_instance = MockAIProvider()
+        raise ValueError(
+            f"AI provider '{provider_name}' requested but API key not set or provider invalid. "
+            f"Please configure the API keys in your .env file."
+        )
 
     return _provider_instance

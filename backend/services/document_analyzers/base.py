@@ -37,6 +37,49 @@ class BaseAnalyzer(ABC):
     # Shared utility methods available to all analyzers
     # -----------------------------------------------------------------------
 
+    def _check_type_mismatch(self, expected_category: str, text: str, extracted_data: dict) -> tuple[bool, str]:
+        """
+        Verify if the document matches the expected category.
+        Returns (is_mismatch, detail_message).
+        """
+        # 1. Check pre-extracted mock/data flags
+        if extracted_data and (extracted_data.get('invalid_document_type') or extracted_data.get('document_type_mismatch')):
+            return True, extracted_data.get('error_detail') or f"Uploaded document is not a valid {expected_category}."
+
+        if not text:
+            return False, ""
+
+        text_lower = text.lower()
+        
+        # 2. Check for educational/school certificate keywords in non-educational visa docs
+        school_keywords = [
+            'school leaving', 'leaving certificate', 'secondary school', 'board of secondary',
+            'ssc', 'hsc', 'marksheet', 'mark sheet', 'passing certificate', 'transfer certificate',
+            'bonafide certificate', 'educational board', '10th standard', '10th class', '12th standard', 
+            '12th class', 'roll no', 'school board', 'board of intermediate', 'educational certificate'
+        ]
+        
+        has_school_keyword = any(kw in text_lower for kw in school_keywords)
+        
+        if has_school_keyword and expected_category in ['passport', 'bank_statement', 'salary_slip', 'employment_letter', 'tax_return']:
+            return True, f"Document Type Mismatch: Uploaded document for '{expected_category}' appears to be a School Leaving / SSC Certificate or Marksheet."
+
+        # 3. Check for specific document requirements
+        if expected_category == 'passport':
+            passport_indicators = ['passport', 'republic', 'nationality', 'expiry', 'surname', 'given name', 'mrz']
+            has_passport_indicator = any(ind in text_lower for ind in passport_indicators)
+            if not has_passport_indicator and len(text_lower) > 100:
+                return True, "Document Type Mismatch: Uploaded document does not contain any Passport-related fields or indicators."
+
+        elif expected_category == 'bank_statement':
+            bank_indicators = ['bank', 'statement', 'account', 'balance', 'transaction', 'deposit', 'withdrawal', 'closing']
+            has_bank_indicator = any(ind in text_lower for ind in bank_indicators)
+            if not has_bank_indicator and len(text_lower) > 100:
+                return True, "Document Type Mismatch: Uploaded document does not contain any Bank Statement fields or indicators."
+
+        return False, ""
+
+
     def extract_name(self, text: str, default: str = "N/A") -> str:
         """Extract a person's name from document text."""
         patterns = [

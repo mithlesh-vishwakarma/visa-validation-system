@@ -72,6 +72,30 @@ def run_submission_validation(submission_id):
 
             extracted = doc.extracted_data or {}
             
+            # Check for document type mismatch flagged by AI analysis
+            ai_analysis = doc.ai_analysis or {}
+            is_type_mismatch = (
+                ai_analysis.get('invalid_document_type')
+                or any("type mismatch" in str(a).lower() or "document mismatch" in str(a).lower() for a in ai_analysis.get('anomalies', []))
+            )
+            
+            if is_type_mismatch:
+                doc_is_valid = False
+                mismatch_anomaly = next(
+                    (str(a) for a in ai_analysis.get('anomalies', []) if "mismatch" in str(a).lower()),
+                    f"Uploaded document does not match category {doc.name}"
+                )
+                doc_errors.append(mismatch_anomaly)
+                issues.append(f"Document mismatch for '{doc.name}': {mismatch_anomaly}")
+                score -= 40
+                recommendations_list.append(f"Please upload a proper {doc.name} instead of the incorrect document.")
+                # Update document status based on validation and skip deeper rules
+                doc.status = 'Invalid'
+                doc.validation_result = {"status": "Failed", "errors": doc_errors}
+                doc.save()
+                continue
+
+            
             # Specific Rules: Passport
             if 'passport' in req_doc_clean:
                 expiry_str = extracted.get('expiry_date')

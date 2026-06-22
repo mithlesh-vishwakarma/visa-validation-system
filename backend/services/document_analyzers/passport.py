@@ -19,6 +19,27 @@ class PassportAnalyzer(BaseAnalyzer):
     def analyze(self, raw_text: str, extracted_data: dict) -> dict:
         text = raw_text or ''
 
+        # --- Check Type Mismatch ---
+        is_mismatch, mismatch_detail = self._check_type_mismatch('passport', text, extracted_data)
+        if is_mismatch:
+            return {
+                "document_type": "passport",
+                "invalid_document_type": True,
+                "holder_name": "N/A",
+                "nationality": "N/A",
+                "passport_number": "N/A",
+                "date_of_birth": "1990-01-01",
+                "issue_date": "2020-01-01",
+                "expiry_date": "2020-01-01",
+                "months_remaining_validity": 0,
+                "is_expired": True,
+                "expiring_soon": False,
+                "mrz_detected": False,
+                "anomalies": [mismatch_detail],
+                "confidence": 0.0,
+            }
+
+
         # --- Extract Name ---
         name = extracted_data.get('name') or self._extract_passport_name(text)
 

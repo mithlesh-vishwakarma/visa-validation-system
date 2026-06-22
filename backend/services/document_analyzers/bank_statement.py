@@ -25,6 +25,30 @@ class BankStatementAnalyzer(BaseAnalyzer):
     def analyze(self, raw_text: str, extracted_data: dict) -> dict:
         text = raw_text or ''
 
+        # --- Check Type Mismatch ---
+        is_mismatch, mismatch_detail = self._check_type_mismatch('bank_statement', text, extracted_data)
+        if is_mismatch:
+            return {
+                "document_type": "bank_statement",
+                "invalid_document_type": True,
+                "account_holder": "N/A",
+                "bank_name": "N/A",
+                "account_number": "N/A",
+                "opening_balance": 0.0,
+                "closing_balance": 0.0,
+                "average_balance": 0.0,
+                "total_credits_3m": 0.0,
+                "total_debits_3m": 0.0,
+                "monthly_income_estimate": 0.0,
+                "financial_stability_score": 0,
+                "large_deposits_count": 0,
+                "large_withdrawals_count": 0,
+                "currency": "INR",
+                "anomalies": [mismatch_detail],
+                "confidence": 0.0,
+            }
+
+
         # --- Extract Core Fields ---
         account_holder = (
             extracted_data.get('name')

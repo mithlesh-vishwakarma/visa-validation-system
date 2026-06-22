@@ -266,19 +266,23 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 destination.write(chunk)
 
         # Run OCR + AI analysis pipeline
-        ocr_result = {}
         try:
             ocr_result = extract_document_data(
                 temp_file_path, name, file_obj.name,
                 existing_category=category
             )
         except Exception as e:
-            from services.ocr_service import _build_mock_result
-            ocr_result = _build_mock_result(category, name, file_obj.name)
-        finally:
             # Clean up temp file
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+            return Response(
+                {"detail": f"OCR processing failed: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Clean up temp file
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
         # Create Document record with all extracted data
         document = Document.objects.create(

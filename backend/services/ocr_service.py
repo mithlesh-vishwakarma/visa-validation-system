@@ -77,7 +77,7 @@ def extract_document_data(file_path: str, doc_type: str, file_name: str = "",
     Args:
         file_path: Absolute path to the uploaded file
         doc_type: User-provided document type name (e.g., "Passport")
-        file_name: Original filename (used for mock data hints)
+        file_name: Original filename
         existing_category: Already-resolved category slug
 
     Returns:
@@ -98,20 +98,21 @@ def extract_document_data(file_path: str, doc_type: str, file_name: str = "",
     if is_pdf and os.path.exists(file_path):
         raw_text, confidence_score = _extract_pdf_text(file_path)
     elif os.path.exists(file_path):
-        # Image files: future Tesseract integration point
         raw_text, confidence_score = _extract_image_text(file_path)
 
     if not raw_text.strip():
-        logger.warning(f"No text extracted from '{file_name}'. Using smart mock data.")
-        return _build_mock_result(category, doc_type, file_name)
+        raise ValueError(
+            f"OCR text extraction failed: No text could be extracted from '{file_name}'. "
+            f"Please ensure it is a valid, clear, and readable document."
+        )
 
     # Heuristic regex extraction (fast, always runs)
     extracted_data = _parse_text_heuristics(raw_text, category)
 
-    # AI structured analysis via document analyzers
-    from services.document_analyzers import get_analyzer
-    analyzer = get_analyzer(category)
-    ai_analysis = analyzer.analyze(raw_text, extracted_data)
+    # AI structured analysis via document analyzers (routed through configured AI Provider)
+    from services.ai_provider import get_ai_provider
+    ai_provider = get_ai_provider()
+    ai_analysis = ai_provider.analyze_document(category, raw_text, extracted_data)
 
     return {
         "category": category,
@@ -124,46 +125,76 @@ def extract_document_data(file_path: str, doc_type: str, file_name: str = "",
 
 def _extract_pdf_text(file_path: str) -> tuple[str, float]:
     """
-    Extract all text from a PDF file using pdfplumber.
-
-    Returns:
-        (raw_text, confidence_score)
+    Extract text from a PDF file using Tesseract OCR.
+    Converts PDF pages to images using PyMuPDF (fitz), then runs Tesseract.
     """
     try:
-        import pdfplumber
-        text_parts = []
-        with pdfplumber.open(file_path) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text_parts.append(page_text)
+        import pytesseract # type: ignore
+        from PIL import Image
+        import fitz # type: ignore
+        import io
 
-        full_text = '\n'.join(text_parts).strip()
-        # Confidence heuristic: proportion of non-whitespace chars to total chars
+        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+        logger.info(f"Running Tesseract OCR on PDF: {file_path}")
+        text_parts = []
+        doc = fitz.open(file_path)
+
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            pix = page.get_pixmap(dpi=150)
+            img_data = pix.tobytes("png")
+            img = Image.open(io.BytesIO(img_data))
+
+            page_text = pytesseract.image_to_string(img)
+            if page_text.strip():
+                text_parts.append(page_text)
+
+        full_text = "\n".join(text_parts).strip()
+
         if full_text:
-            non_ws = len(full_text.replace(' ', '').replace('\n', ''))
-            confidence = min(1.0, non_ws / max(len(full_text), 1) * 2)
+            alnum_count = sum(1 for c in full_text if c.isalnum())
+            total_len = len(full_text.replace(" ", "").replace("\n", ""))
+            confidence = min(1.0, alnum_count / max(total_len, 1) * 1.5)
         else:
             confidence = 0.0
 
-        logger.info(f"PDF extraction: {len(full_text)} chars, confidence: {confidence:.2f}")
+        logger.info(f"PDF OCR complete: {len(full_text)} chars, confidence: {confidence:.2f}")
         return full_text, round(confidence, 3)
 
-    except ImportError:
-        logger.error("pdfplumber not installed")
-        return "", 0.0
     except Exception as e:
-        logger.error(f"PDF extraction error: {e}")
+        logger.error(f"PDF OCR extraction error: {e}")
         return "", 0.0
 
 
 def _extract_image_text(file_path: str) -> tuple[str, float]:
     """
-    Placeholder for image OCR (Tesseract / Azure Vision).
-    Currently returns empty text and falls back to mock data.
+    Extract text from an image file using Tesseract OCR.
     """
-    logger.info(f"Image OCR not yet implemented for: {file_path}")
-    return "", 0.0
+    try:
+        import pytesseract # type: ignore
+        from PIL import Image
+
+        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+        logger.info(f"Running Tesseract OCR on image: {file_path}")
+        img = Image.open(file_path)
+        raw_text = pytesseract.image_to_string(img)
+
+        full_text = raw_text.strip()
+        if full_text:
+            alnum_count = sum(1 for c in full_text if c.isalnum())
+            total_len = len(full_text.replace(" ", "").replace("\n", ""))
+            confidence = min(1.0, alnum_count / max(total_len, 1) * 1.5)
+        else:
+            confidence = 0.0
+
+        logger.info(f"Image OCR complete: {len(full_text)} chars, confidence: {confidence:.2f}")
+        return full_text, round(confidence, 3)
+
+    except Exception as e:
+        logger.error(f"Image OCR extraction error: {e}")
+        return "", 0.0
 
 
 def _parse_text_heuristics(text: str, category: str) -> dict:
@@ -240,97 +271,7 @@ def _parse_text_heuristics(text: str, category: str) -> dict:
     return data
 
 
-def _build_mock_result(category: str, doc_type: str, file_name: str = "") -> dict:
-    """
-    Build intelligent mock data when OCR text extraction fails.
-    Used for image files and unreadable PDFs.
-    """
-    from services.document_analyzers import get_analyzer
-    mock_extracted = generate_mock_extracted(category, file_name)
-    analyzer = get_analyzer(category)
-    ai_analysis = analyzer.analyze("", mock_extracted)
-
-    # Give mock data lower confidence than real OCR
-    return {
-        "category": category,
-        "raw_text": "",
-        "confidence_score": 0.45,  # Lower confidence for mock data
-        "extracted_data": mock_extracted,
-        "ai_analysis": ai_analysis,
-    }
-
-
-def generate_mock_extracted(category: str, file_name: str = "") -> dict:
-    """
-    Generate realistic mock extracted data per document category.
-    File name hints (e.g., 'expired_passport.pdf') influence the mock data.
-    """
-    file_name_lower = file_name.lower()
-
-    if category == 'passport':
-        if 'expired' in file_name_lower:
-            expiry = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        else:
-            expiry = (datetime.now() + timedelta(days=730)).strftime('%Y-%m-%d')
-        return {
-            'passport_number': 'P9876543',
-            'name': 'Rahul Sharma',
-            'expiry_date': expiry,
-            'nationality': 'Indian',
-            'dob': '1992-08-14',
-        }
-
-    elif category == 'bank_statement':
-        if 'low' in file_name_lower or 'poor' in file_name_lower:
-            balance = 45000.0
-        else:
-            balance = 380000.0
-        return {
-            'bank_balance': balance,
-            'name': 'Rahul Sharma',
-            'account_number': 'XXXX0042',
-            'currency': 'INR',
-        }
-
-    elif category == 'salary_slip':
-        return {
-            'salary': 75000.0,
-            'company_name': 'Globex Technologies Pvt Ltd',
-            'name': 'Rahul Sharma',
-            'designation': 'Senior Software Engineer',
-        }
-
-    elif category == 'employment_letter':
-        return {
-            'company_name': 'Globex Technologies Pvt Ltd',
-            'designation': 'Senior Software Engineer',
-            'name': 'Rahul Sharma',
-        }
-
-    elif category == 'tax_return':
-        return {
-            'total_income': 900000.0,
-            'assessment_year': '2024-25',
-            'name': 'Rahul Sharma',
-        }
-
-    elif category == 'travel_history':
-        return {
-            'countries': ['Singapore', 'Thailand', 'UAE'],
-        }
-
-    else:
-        return {
-            'document_type': category,
-            'extracted_on': datetime.now().strftime('%Y-%m-%d'),
-        }
-
-
-# Kept for backward compatibility with existing views
-def generate_mock_data(doc_type: str, file_name: str = "") -> dict:
-    """Legacy shim — routes to generate_mock_extracted."""
-    category = resolve_category(doc_type)
-    return generate_mock_extracted(category, file_name)
+# Mock generation code removed as mock data fallbacks are disabled.
 
 
 def _normalize_date(date_str: str) -> str:

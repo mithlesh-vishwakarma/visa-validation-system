@@ -52,7 +52,7 @@ The platform abstracts AI services behind a unified `AIProvider` base class (in 
 - **Mock AI Provider**: Default option. Requires no API keys. Generates highly realistic assessments, anomalies, and recommendations based on filenames and mock rules.
 - **OpenAI Provider**: Uses GPT-4o-mini to analyze documents.
 - **Claude Provider**: Uses Claude-3-Haiku.
-- **Gemini Provider**: Uses Gemini-1.5-Flash.
+- **Gemini Provider**: Uses Gemini-2.5-Flash.
 
 ---
 
@@ -131,7 +131,7 @@ ANTHROPIC_MODEL=claude-3-haiku-20240307
 
 # Gemini Settings (optional)
 GOOGLE_AI_API_KEY=your-gemini-api-key
-GOOGLE_AI_MODEL=gemini-1.5-flash
+GOOGLE_AI_MODEL=gemini-2.5-flash
 
 # Celery (defaults to sync Eager execution. For Redis async queue, set Celery Eager to False)
 CELERY_TASK_ALWAYS_EAGER=True

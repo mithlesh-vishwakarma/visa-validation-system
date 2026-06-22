@@ -305,6 +305,16 @@ def _score_documentation(documents: list) -> tuple[int, str]:
     if not documents:
         return 0, "No documents uploaded"
 
+    has_mismatch = any(
+        doc.ai_analysis.get('invalid_document_type')
+        or any("type mismatch" in str(a).lower() or "document mismatch" in str(a).lower() for a in doc.ai_analysis.get('anomalies', []))
+        for doc in documents
+        if doc.ai_analysis
+    )
+    if has_mismatch:
+        return 0, "Document type mismatch detected (invalid document uploaded)"
+
+
     total_confidence = sum(doc.confidence_score or 0 for doc in documents)
     avg_confidence = total_confidence / len(documents)
 
